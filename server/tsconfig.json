@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "lib": ["ES2020"],
+    "outDir": "./dist",
+    "strict": true,
+    "noImplicitAny": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "paths": {
+      "@cipher/shared": ["../shared/src/index.ts"]
+    }
+  },
+  "include": ["src", "../shared/src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

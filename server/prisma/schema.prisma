@@ -1,0 +1,30 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id               String    @id @default(cuid())
+  username         String    @unique
+  passwordHash     String
+  publicKeyB64     String
+  createdAt        DateTime  @default(now())
+  sentMessages     Message[] @relation("Sender")
+  receivedMessages Message[] @relation("Recipient")
+}
+
+model Message {
+  id               String   @id @default(cuid())
+  encryptedPayload String
+  encryptedKey     String
+  iv               String
+  senderId         String
+  recipientId      String
+  createdAt        DateTime @default(now())
+  sender           User     @relation("Sender",    fields: [senderId],    references: [id])
+  recipient        User     @relation("Recipient", fields: [recipientId], references: [id])
+}
