@@ -7,15 +7,31 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Dependencies
+node_modules/
+
+# Build Output
+dist/
+dist-ssr/
+
+# TypeScript & Linter Caches
+*.tsbuildinfo
+.eslintcache
+.stylelintcache
+
+# Environment Variables (CRITICAL FOR SECURITY)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 *.local
 
-# Editor directories and files
+# OS and Editor directories
 .vscode/*
 !.vscode/extensions.json
-.idea
+!.vscode/settings.json
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
