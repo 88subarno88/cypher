@@ -1,122 +1,84 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+// ── WHAT IS THIS FILE? ────────────────────────────────────
+// The root component. Defines all routes and wraps protected
+// routes in an auth guard that redirects unauthenticated users
+// to /login.
+//
+// ── RESOURCES TO READ FIRST ───────────────────────────────
+// React Router v6 — defining routes:
+//   https://reactrouter.com/en/main/components/routes
+// Read: Routes, Route, Navigate components.
+// Focus on: how to nest routes, how Navigate works for redirects.
+//
+// ── WHAT TO WRITE ─────────────────────────────────────────
+//
+// IMPORTS YOU NEED:
+import { Routes, Route, Navigate } from "react-router-dom";
+import { useMyStore } from "./store/authStore";
+import Register from "./pages/register";
+import Login from "./pages/login";
+import Chat from "./pages/chat";
 
-function App() {
-  const [count, setCount] = useState(0)
-
+//
+// ── PART 1: Write a ProtectedRoute component ──────────────
+// A ProtectedRoute is a small wrapper component that checks if
+// the user is logged in. If yes, it renders its children.
+// If no, it redirects to /login.
+//
+// How to write it:
+function ProtectedRoute({ children}: { children: React.ReactNode }) {
+  const token = useMyStore((s) => s.getAccessToken());
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+}
+//
+//   → useAuthStore reads the token from the auth store (Day 3)
+//   → getAccessToken() checks state AND localStorage
+//   → If no token: <Navigate to="/login" replace /> redirects immediately
+//   → "replace" means the /chat URL is replaced in history (not added)
+//     so the user cannot press Back to get to /chat without logging in
+//   → If there IS a token: render children (whatever is inside)
+//
+// ── PART 2: Write the App component with Routes ───────────
+export default function App() {
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    <Routes>
+      <Route path="/login"    element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route
+        path="/chat"
+        element={
+          <ProtectedRoute>
+            <Chat />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/" element={<Navigate to="/login" replace />} />
+    </Routes>
   )
 }
-
-export default App
+//
+// ── WHAT EACH ROUTE DOES ──────────────────────────────────
+// /login    → shows Login page (always accessible)
+// /register → shows Register page (always accessible)
+// /chat     → wrapped in ProtectedRoute — redirects to /login if no token
+// /         → root URL redirects to /login automatically
+//
+// ── END-OF-DAY TEST FOR THIS FILE ────────────────────────
+// 1. Visit localhost:5173/chat WITHOUT being logged in
+//    → Must redirect to /login automatically
+// 2. Visit localhost:5173/login
+//    → Must show the Login page
+// 3. Visit localhost:5173/register
+//    → Must show the Register page
+// If any redirect does not work, getAccessToken() in authStore
+// is not reading localStorage correctly.
+//
+// ── COMMON MISTAKES ───────────────────────────────────────
+// ✗ Using <Redirect> instead of <Navigate>
+//   → Redirect was React Router v5. v6 uses Navigate.
+//
+// ✗ Forgetting "replace" on Navigate
+//   → Without replace, pressing Back after redirect goes to /chat
+//     which immediately redirects again — infinite loop in history
