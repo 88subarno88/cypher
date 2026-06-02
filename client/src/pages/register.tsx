@@ -4,18 +4,21 @@ import { useKeyPair } from "../hooks/usekeypair";
 import Button from "../components/ui/button";
 import Input from "../components/ui/input";
 
+// ── DAY 6 NEW IMPORTS ─────────────────────────────────────
+import { register } from "../api/auth"; // calls POST /auth/register
+import { exportPublicKey } from "../crypto"; // gets Base64 public key string
+import { useCryptoStore } from "../store/cryptoStore"; // reads keyPair from memory
+
 export default function RegisterForm() {
   const [username, setUsername] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  //hooks
   const navigate = useNavigate();
   const { saveKeyPair } = useKeyPair();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    // Prevent page refresh
     e.preventDefault();
 
     if (!username || !password) {
@@ -23,19 +26,34 @@ export default function RegisterForm() {
       return;
     }
 
-    // Reset states for a new attempt
     setIsLoading(true);
     setError(null);
 
     try {
-      //  Attempt to load the key pair from IndexedDB
       await saveKeyPair(password);
       console.log("Key pair generated and saved to IndexedDB");
-      // Navigate to chat
+
+      const keyPair = useCryptoStore.getState().keyPair;
+      if (!keyPair) throw new Error("Key pair not found after generation");
+
+      const publicKeyB64 = await exportPublicKey(keyPair.publicKey);
+
+      await register({ username, password, publicKeyB64 });
+      console.log("Registered on server successfully");
+
       navigate("/login");
-    } catch (err) {
-      // error
-      setError("Registration failed. Please try again.");
+    } catch (err: any) {
+      if (err?.response?.status === 409) {
+        // Server returned 409 Conflict — username already taken
+        setError("Username already taken. Please choose another.");
+      } else if (err?.response?.status === 400) {
+        // Server returned 400 — validation failed (e.g. password too short)
+        setError(
+          "Invalid input. Username must be 3+ chars, password 8+ chars.",
+        );
+      } else {
+        setError("Registration failed. Please try again.");
+      }
       console.error("Registration error:", err);
     } finally {
       setIsLoading(false);
@@ -81,7 +99,7 @@ export default function RegisterForm() {
       </div>
 
       <button type="submit" disabled={isLoading}>
-        {isLoading ? "Running PBKDF2..." : "Register"}
+        {isLoading ? "Registering..." : "Register"}
       </button>
     </form>
   );

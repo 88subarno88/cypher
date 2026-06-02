@@ -3,20 +3,21 @@ import { useNavigate } from "react-router-dom";
 import { useKeyPair } from "../hooks/usekeypair";
 import Button from "../components/ui/button";
 import Input from "../components/ui/input";
+import { login } from "../api/auth"; // calls POST /auth/login
+import { useMyStore } from "../store/authStore"; // your store name from Day 3
 
 export default function LoginForm() {
-  // ── STATE ──
   const [username, setUsername] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  //hooks
   const navigate = useNavigate();
   const { loadKeyPair } = useKeyPair();
 
+  const { setTokens, setUser, logout } = useMyStore();
+
   const handleSubmit = async (e: React.FormEvent) => {
-    // Prevent page refresh
     e.preventDefault();
 
     if (!username || !password) {
@@ -24,26 +25,41 @@ export default function LoginForm() {
       return;
     }
 
-    // Reset states for a new attempt
     setIsLoading(true);
     setError(null);
 
     try {
-      //  Attempt to load the key pair from IndexedDB
+      const authResponse = await login({ username, password });
+      console.log("Server login successful");
+
+      setTokens(authResponse.accessToken, authResponse.refreshToken);
+      setUser(authResponse.user);
+
       const success = await loadKeyPair(password);
 
       if (!success) {
-        setError("Wrong password or no account found");
+        // Password matched the server but not the stored key
+        // This can happen if the user registered on a different device
+        // or if IndexedDB was cleared
+        setError("Could not restore encryption keys. Try re-registering.");
+        // Undo the token storage — do not leave the user half-logged-in
+        logout();
         setIsLoading(false);
         return;
       }
       console.log("Private key restored into cryptoStore");
 
-      // Navigate to chat
       navigate("/chat");
-    } catch (err) {
-      // error
-      setError("Login failed. Please try again.");
+    } catch (err: any) {
+      if (err?.response?.status === 401) {
+        // Server returned 401 — wrong username or password
+        setError("Invalid username or password.");
+      } else if (err?.response?.status === 429) {
+        // Server returned 429 — too many attempts (rate limiter, Day 9)
+        setError("Too many login attempts. Please wait a minute.");
+      } else {
+        setError("Login failed. Please try again.");
+      }
       console.error("Login error:", err);
     } finally {
       setIsLoading(false);
@@ -89,7 +105,7 @@ export default function LoginForm() {
       </div>
 
       <button type="submit" disabled={isLoading}>
-        {isLoading ? "Running PBKDF2..." : "Login"}
+        {isLoading ? "Logging in..." : "Login"}
       </button>
     </form>
   );

@@ -15,16 +15,19 @@ export const useMyStore = create<AuthState>()((set, get) => ({
   accessToken: null,
   refreshToken: null,
   user: null,
+
   setTokens: (accessToken, refreshToken) => {
     localStorage.setItem("accessToken", accessToken);
     set({ accessToken, refreshToken });
   },
+
   setUser: (user) => set({ user }),
+
   logout: () => {
     localStorage.removeItem("accessToken");
     set({ accessToken: null, refreshToken: null, user: null });
   },
+
   getAccessToken: () =>
     get().accessToken ?? localStorage.getItem("accessToken"),
 }));
-
