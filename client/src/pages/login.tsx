@@ -4,7 +4,7 @@ import { useKeyPair } from "../hooks/usekeypair";
 import Button from "../components/ui/button";
 import Input from "../components/ui/input";
 import { login } from "../api/auth"; // calls POST /auth/login
-import { useMyStore } from "../store/authStore"; // your store name from Day 3
+import { useMyStore } from "../store/authStore"; 
 
 export default function LoginForm() {
   const [username, setUsername] = useState<string>("");
