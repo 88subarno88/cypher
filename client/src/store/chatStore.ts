@@ -10,33 +10,67 @@ export interface Conversation {
 }
 
 export interface ChatState {
-  //state
+  // state
   conversations: Conversation[];
   messages: Record<string, DecryptedMessage[]>;
   activeConversationId: string | null;
-  //action
+
+  // actions
   setConversations(conversations: Conversation[]): void;
-  setHistory(conversationId: string, messages: DecryptedMessage[]): void;
+  setActiveConversation(id: string | null): void;
   setHistory(conversationId: string, messages: DecryptedMessage[]): void;
   addMessage(conversationId: string, message: DecryptedMessage): void;
+
+  addOrUpdateConversation(conv: Conversation): void;
 }
 
 export const useChatStore = create<ChatState>()((set) => ({
   conversations: [],
   messages: {},
   activeConversationId: null,
+
   setConversations: (conversations) => set({ conversations }),
-  setActiveConversation: (id: string | null) =>
-    set({ activeConversationId: id }),
+
+  setActiveConversation: (id) => set({ activeConversationId: id }),
+
   setHistory: (conversationId, messages) =>
     set((state) => ({
-      messages: { ...state.messages, [conversationId]: messages }, //state.message keeps all messages safe intact 
+      messages: { ...state.messages, [conversationId]: messages }, // state.messages keeps all other convos intact
     })),
+
   addMessage: (conversationId, message) =>
     set((state) => ({
       messages: {
         ...state.messages,
-        [conversationId]: [...(state.messages[conversationId]??[]), message],   // ... adds old array into existing array 
-      },                                                                        // ?? is first time chatting defaults to [] else loads prev convo 
+        [conversationId]: [
+          ...(state.messages[conversationId] ?? []), // ?? [] = first message ever in this convo defaults to empty array
+          message,
+        ],
+      },
     })),
+
+  //   Check if a conversation with this recipientId already exists.
+  //   If YES  update its lastMessage and lastMessageAt in place.
+  //   If NO   add it to the FRONT of the array (most recent first).
+  addOrUpdateConversation: (conv) =>
+    set((state) => {
+      const exists = state.conversations.find(
+        (c) => c.recipientId === conv.recipientId,
+      );
+
+      if (exists) {
+        // Update the existing entry with new lastMessage preview
+        return {
+          conversations: state.conversations.map((c) =>
+            c.recipientId === conv.recipientId
+              ? { ...c, ...conv } // spread keeps old fields, new fields override
+              : c,
+          ),
+        };
+      }
+
+      return {
+        conversations: [conv, ...state.conversations],
+      };
+    }),
 }));
