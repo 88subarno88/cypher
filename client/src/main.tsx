@@ -10,11 +10,11 @@ const queryClient=new QueryClient();
 const rootElement = document.getElementById("root")
 if (!rootElement) throw new Error("Root element not found");
 ReactDOM.createRoot(rootElement!).render(
-            <React.StrictMode>          
+            // <React.StrictMode>          
            <QueryClientProvider client={queryClient}>
              <BrowserRouter> 
                <App />
              </BrowserRouter>  {/*easy access to differnt urls in app without refresh*/}
-           </QueryClientProvider> {/*acess memory/cache in whole app*/}
-         </React.StrictMode>  //doublecheck code and look for bad practice*/
+           </QueryClientProvider> 
+        //  </React.StrictMode>  //doublecheck code and look for bad practice*/
        )

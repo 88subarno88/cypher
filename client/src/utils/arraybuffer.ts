@@ -1,7 +1,11 @@
 //Converts raw bytes -> Base64 string ; ciphertext(arraybuffer) and json(string)
 //btoa (binary string -> Base64); atob()->reverse
-export function toBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
+//FIX: now accepts BOTH ArrayBuffer and Uint8Array so salt/iv encode the
+//exact same bytes that were used during key derivation.
+export function toBase64(buffer: ArrayBuffer | Uint8Array): string {
+  // If already a Uint8Array, use it directly (encodes exact bytes including
+  // any byteOffset). Otherwise wrap the ArrayBuffer in a Uint8Array view.
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   let normalSt = "";
   for (let i = 0; i < bytes.length; i++) {
     normalSt += String.fromCharCode(bytes[i]);

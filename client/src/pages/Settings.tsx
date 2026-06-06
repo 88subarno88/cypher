@@ -121,8 +121,9 @@ export default function Settings() {
         // Blocklist the refresh token on the server (Day 9)
         await apiClient.post("/auth/logout", { refreshToken });
       }
-    } catch {
-      // Even if the server call fails, log out locally
+    } catch (err) {
+      console.error("LOAD KEY FAILED:", err); // ← add this line
+      return false;
     } finally {
       useCryptoStore.getState().clearKeyPair();
       useMyStore.getState().logout();

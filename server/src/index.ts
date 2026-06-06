@@ -2,7 +2,8 @@ import "dotenv/config";
 import http from "http";
 import { Server } from "socket.io";
 import app from "./app";
-import {logger} from "./lib/logger"; 
+import { setupSocket } from "./socket/index";
+import { logger } from "./lib/logger";
 
 // Create an HTTP server that wraps the Express app
 const httpServer = http.createServer(app);
@@ -15,10 +16,16 @@ const io = new Server(httpServer, {
   },
 });
 
+// ── THE MISSING LINE ───────────────────────────────────
+// Wires up JWT auth, room joining, and message:send handler.
+// Without this, sockets connect but no messages are relayed.
+setupSocket(io);
+// ───────────────────────────────────────────────────────
+
 // Read the port from environment (fallback to 3000)
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-//Start listening
+// Start listening
 httpServer.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
 });
