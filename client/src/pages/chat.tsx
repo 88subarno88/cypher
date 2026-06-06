@@ -179,7 +179,7 @@ export default function Chat() {
                   fontWeight: 500,
                 }}
               >
-                🔒 End-to-end encrypted
+                End-to-end encrypted
               </span>
             </div>
 

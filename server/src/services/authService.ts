@@ -95,7 +95,7 @@ export async function refreshAccessToken(
 }
 
 // ── logout ────────────────────────────────────────────────
-// Day 9: Adds the refresh token to Redis blocklist so it
+//Adds the refresh token to Redis blocklist so it
 // cannot be used to get new access tokens after logout.
 export async function logout(refreshToken: string): Promise<void> {
   // Store in Redis for 7 days (the token's remaining lifetime)
