@@ -22,7 +22,7 @@ apiClient.interceptors.response.use(
       try {
         const newToken = await refreshToken();
         const currentRefreshToken = useMyStore.getState().refreshToken;
-        useMyStore.getState().setTokens(newToken, currentRefreshToken);
+        useMyStore.getState().setTokens(newToken, currentRefreshToken ?? "");
         error.config.headers.Authorization = `Bearer ${newToken}`;
         return apiClient(error.config);
       } catch {
@@ -30,6 +30,7 @@ apiClient.interceptors.response.use(
         return Promise.reject(error);
       }
     }
+    return Promise.reject(error);
   },
 );
 

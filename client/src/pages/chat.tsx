@@ -11,29 +11,37 @@ import ConversationList from "../components/ui/conversationlist";
 import MessageBubble from "../components/ui/messaguble";
 import type { DecryptedMessage } from "../../../shared/src/types/message";
 
+// ── FIX 1: Define stable empty array OUTSIDE the component ──
+// If this was inside the component, React creates a new [] reference
+// on every render → Zustand thinks state changed → re-renders → infinite loop
+const EMPTY_MESSAGES: DecryptedMessage[] = [];
+
 export default function Chat() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedUsername, setSelectedUsername] = useState<string>("");
   const [messageInput, setMessageInput] = useState<string>("");
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
 
-  // Auto-scroll to bottom when new messages arrive
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Read messages for the selected conversation from the store
-  const messages = useChatStore((s) => s.messages[selectedUserId ?? ""] ?? []);
+  // ── FIX 1 applied: use EMPTY_MESSAGES instead of [] ────────
+  const messages = useChatStore(
+    (s) => s.messages[selectedUserId ?? ""] ?? EMPTY_MESSAGES,
+  );
 
   const { sendMessage, isSending, sendError } = useEncryptedChat();
-  const addOrUpdateConversation = useChatStore(
-    (s) => s.addOrUpdateConversation,
-  );
+
+  // ── FIX 2: Do NOT select functions via useChatStore() selector ──
+  // Selecting a function reference this way can trigger re-renders.
+  // Use getState() inside handlers instead — it reads store imperatively.
+  // (removed: const addOrUpdateConversation = useChatStore(...))
 
   useEffect(() => {
     socket.connect();
-    const cleanup = registerHandlers(); // registers message:receive handler
+    const cleanup = registerHandlers();
     return () => {
-      cleanup(); // remove handlers to prevent duplicates
-      socket.disconnect(); // disconnect when leaving chat page
+      cleanup();
+      socket.disconnect();
     };
   }, []);
 
@@ -54,10 +62,8 @@ export default function Chat() {
           return;
         }
 
-        // Fetch encrypted messages from server
         const encrypted = await fetchHistory(selectedUserId!);
 
-        // Decrypt each message one by one
         const decrypted: DecryptedMessage[] = await Promise.all(
           encrypted.map(async (msg) => {
             const plaintext = await decryptMessage(msg, privateKey);
@@ -71,7 +77,6 @@ export default function Chat() {
           }),
         );
 
-        // Store decrypted messages in chatStore
         useChatStore.getState().setHistory(selectedUserId!, decrypted);
       } catch (err) {
         console.error("Failed to load history:", err);
@@ -83,12 +88,11 @@ export default function Chat() {
     loadHistory();
   }, [selectedUserId]);
 
-
   const handleSelectConversation = (userId: string, username: string) => {
     setSelectedUserId(userId);
     setSelectedUsername(username);
-    // Add to conversation list if not already there
-    addOrUpdateConversation({
+    // ── FIX 2 applied: use getState() instead of selector ──
+    useChatStore.getState().addOrUpdateConversation({
       id: userId,
       recipientId: userId,
       recipientUsername: username,
@@ -99,12 +103,12 @@ export default function Chat() {
     if (!selectedUserId || !messageInput.trim()) return;
 
     const text = messageInput;
-    setMessageInput(""); // clear input immediately so it feels responsive
+    setMessageInput("");
 
     await sendMessage(selectedUserId, text);
 
-    // Update conversation preview in the left sidebar
-    addOrUpdateConversation({
+    // ── FIX 2 applied here too ──────────────────────────────
+    useChatStore.getState().addOrUpdateConversation({
       id: selectedUserId,
       recipientId: selectedUserId,
       recipientUsername: selectedUsername,
@@ -113,7 +117,6 @@ export default function Chat() {
     });
   };
 
-  // Send on Enter key (Shift+Enter for newline)
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -147,7 +150,6 @@ export default function Chat() {
                 gap: "10px",
               }}
             >
-              {/* Avatar */}
               <div
                 style={{
                   width: "36px",
@@ -166,7 +168,6 @@ export default function Chat() {
               </div>
               {selectedUsername}
 
-              {/* Encrypted badge */}
               <span
                 style={{
                   marginLeft: "auto",
@@ -192,7 +193,6 @@ export default function Chat() {
                 flexDirection: "column",
               }}
             >
-              {/* Loading spinner while history loads */}
               {isLoadingHistory ? (
                 <div
                   style={{
@@ -220,7 +220,6 @@ export default function Chat() {
                   <MessageBubble key={msg.id} message={msg} />
                 ))
               )}
-              {/* Invisible div at the bottom — scrolled into view on new messages */}
               <div ref={messagesEndRef} />
             </div>
 
@@ -290,7 +289,6 @@ export default function Chat() {
             </div>
           </>
         ) : (
-          /* Empty state when no conversation selected */
           <div
             style={{
               flex: 1,

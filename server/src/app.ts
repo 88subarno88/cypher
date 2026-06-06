@@ -2,35 +2,55 @@ import express from "express";
 import helmet from "helmet";
 import cors from "cors";
 
-
 import authRouter from "./routes/auth";
 import keysRouter from "./routes/keys";
+import usersRouter from "./routes/users";
+import messagesRouter from "./routes/messages";
+import { loginRateLimit } from "./middleware/rateLimit";
 
 const app = express();
 
-//Add security headers with helmet
-// This automatically protects  app from common web vulnerabilities
-app.use(helmet());
-
-// Configure CORS
-// This ensures ONLY Vite React app is allowed to talk to  backend
+//Security headers with helmet
+// Added contentSecurityPolicy to block XSS attacks.
+// CSP prevents injected scripts from running critical since
+// crypto keys live in memory and XSS could exfiltrate them.
 app.use(
-  cors({
-    origin: process.env.CLIENT_ORIGIN,
-    credentials: true,
-  })
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:"],
+        connectSrc: ["'self'", "ws://localhost:3000", "http://localhost:3000"],
+      },
+    },
+  }),
 );
 
-//Parse JSON request bodies
+
+//Only exact CLIENT_ORIGIN is allowed. No wildcards.
+app.use(
+  cors({
+    origin: process.env.CLIENT_ORIGIN || "http://localhost:5173",
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+);
+
+// Parse JSON request bodies
 app.use(express.json());
 
-// Any route in auth.ts starts with /auth (e.g., /auth/login)
+// loginRateLimit applied to POST /auth/login only.
+// Other auth routes (register, refresh, logout) are not rate limited here.
+app.use("/auth/login", loginRateLimit);
 app.use("/auth", authRouter);
-// Any route in keys.ts starts with /keys (e.g., /keys/:userId)
 app.use("/keys", keysRouter);
+app.use("/users", usersRouter);
+app.use("/messages", messagesRouter);
 
-// Add a basic health check route
-// Extremely useful for debugging to ensure your server is alive
+// Health check
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });

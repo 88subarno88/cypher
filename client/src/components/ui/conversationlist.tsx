@@ -3,6 +3,7 @@ import { searchUsers } from "../../api/messages";
 import { useChatStore } from "../../store/chatStore";
 import type { Conversation } from "../../store/chatStore";
 
+
 interface ConversationListProps {
   onSelect: (userId: string, username: string) => void;
   selectedUserId: string | null;
