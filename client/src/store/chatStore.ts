@@ -10,17 +10,14 @@ export interface Conversation {
 }
 
 export interface ChatState {
-  // state
   conversations: Conversation[];
   messages: Record<string, DecryptedMessage[]>;
   activeConversationId: string | null;
 
-  // actions
   setConversations(conversations: Conversation[]): void;
   setActiveConversation(id: string | null): void;
   setHistory(conversationId: string, messages: DecryptedMessage[]): void;
   addMessage(conversationId: string, message: DecryptedMessage): void;
-
   addOrUpdateConversation(conv: Conversation): void;
 }
 
@@ -35,42 +32,42 @@ export const useChatStore = create<ChatState>()((set) => ({
 
   setHistory: (conversationId, messages) =>
     set((state) => ({
-      messages: { ...state.messages, [conversationId]: messages }, // state.messages keeps all other convos intact
+      messages: { ...state.messages, [conversationId]: messages },
     })),
 
   addMessage: (conversationId, message) =>
-    set((state) => ({
-      messages: {
-        ...state.messages,
-        [conversationId]: [
-          ...(state.messages[conversationId] ?? []), // ?? [] = first message ever in this convo defaults to empty array
-          message,
-        ],
-      },
-    })),
+    set((state) => {
+      const existing = state.messages[conversationId] ?? [];
+      if (existing.some((m) => m.id === message.id)) {
+        return state; // dedupe — already have it
+      }
+      return {
+        messages: {
+          ...state.messages,
+          [conversationId]: [...existing, message],
+        },
+      };
+    }),
 
-  //   Check if a conversation with this recipientId already exists.
-  //   If YES  update its lastMessage and lastMessageAt in place.
-  //   If NO   add it to the FRONT of the array (most recent first).
   addOrUpdateConversation: (conv) =>
     set((state) => {
-      const exists = state.conversations.find(
+      // Remove the existing entry for this person (if any)
+      const withoutThis = state.conversations.filter(
+        (c) => c.recipientId !== conv.recipientId,
+      );
+
+      // Find the old entry so we can preserve its fields
+      const old = state.conversations.find(
         (c) => c.recipientId === conv.recipientId,
       );
 
-      if (exists) {
-        // Update the existing entry with new lastMessage preview
-        return {
-          conversations: state.conversations.map((c) =>
-            c.recipientId === conv.recipientId
-              ? { ...c, ...conv } // spread keeps old fields, new fields override
-              : c,
-          ),
-        };
-      }
+      // always put the updated conversation at the FRONT
+      // Merge old fields with new (so lastMessage stays if not passed),
+      // then prepend to the list so the most recent chat is on top.
+      const merged: Conversation = { ...old, ...conv };
 
       return {
-        conversations: [conv, ...state.conversations],
+        conversations: [merged, ...withoutThis],
       };
     }),
 }));

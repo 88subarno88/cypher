@@ -51,6 +51,14 @@ export function registerHandlers() {
 
       // I received this, so the other person is the sender
       const otherUserId = payload.senderId;
+      console.log(
+        "RECEIVE | senderId:",
+        payload.senderId,
+        "| recipientId:",
+        payload.recipientId,
+        "| myId:",
+        currentUserId,
+      );
 
       useChatStore.getState().addMessage(otherUserId, decrypted);
 

@@ -4,7 +4,7 @@ import { useChatStore } from "../store/chatStore";
 import { useCryptoStore } from "../store/cryptoStore";
 import { useMyStore } from "../store/authStore";
 import { useEncryptedChat } from "../hooks/useEncryptedchat";
-import { fetchHistory, searchUsers } from "../api/messages";
+import { fetchHistory, searchUsers, fetchConversations } from "../api/messages";
 import { decryptMessage } from "../crypto";
 import { registerHandlers } from "../socket/handlers";
 import socket from "../socket/socket";
@@ -13,7 +13,6 @@ import type { DecryptedMessage } from "../../../shared/src/types/message";
 
 const EMPTY_MESSAGES: DecryptedMessage[] = [];
 
-// ── Avatar component with profile pic support ──────────────
 function Avatar({
   userId,
   username,
@@ -95,15 +94,34 @@ export default function Chat() {
   const { sendMessage, isSending } = useEncryptedChat();
   const currentUser = useMyStore((s) => s.user);
 
-  // Connect once, keep the socket alive (no disconnect on unmount)
+  // Connect socket once, keep it alive
   useEffect(() => {
-    if (!socket.connected) {
-      socket.connect();
-    }
+    if (!socket.connected) socket.connect();
     const cleanup = registerHandlers();
     return () => {
       cleanup();
     };
+  }, []);
+
+  // ── NEW: load existing conversations from the server on mount ──
+  // This rebuilds the sidebar from the database so chats persist
+  // across logins (not just while the tab stays open).
+  useEffect(() => {
+    async function loadConversations() {
+      try {
+        const partners = await fetchConversations();
+        partners.forEach((p) => {
+          useChatStore.getState().addOrUpdateConversation({
+            id: p.id,
+            recipientId: p.id,
+            recipientUsername: p.username,
+          });
+        });
+      } catch (err) {
+        console.error("Failed to load conversations:", err);
+      }
+    }
+    loadConversations();
   }, []);
 
   // Auto-scroll
@@ -111,7 +129,7 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Load history when conversation changes
+  // Load history when a conversation is selected
   useEffect(() => {
     if (!selectedUserId) return;
     async function load() {
@@ -119,19 +137,10 @@ export default function Chat() {
       try {
         const privateKey = useCryptoStore.getState().keyPair?.privateKey;
         if (!privateKey) {
-          console.error(
-            "HISTORY: No private key in memory — log in again to decrypt",
-          );
+          console.error("HISTORY: No private key in memory");
           return;
         }
-
         const encrypted = await fetchHistory(selectedUserId!);
-        console.log("HISTORY: fetched", encrypted.length, "encrypted messages");
-
-        // ── FIX: decrypt each message individually ─────────────
-        // Promise.all fails the WHOLE batch if ONE message can't decrypt.
-        // A message encrypted with an old/rotated key throws OperationError.
-        // Loop instead and skip the bad ones so the good messages still show.
         const decrypted: DecryptedMessage[] = [];
         for (const msg of encrypted) {
           try {
@@ -144,13 +153,9 @@ export default function Chat() {
               timestamp: msg.createdAt ?? new Date().toISOString(),
             });
           } catch {
-            // This message was encrypted with a key we no longer have
-            // (e.g. account was re-registered). Skip it instead of crashing.
             console.warn("Skipping undecryptable message:", msg.id);
           }
         }
-
-        console.log("HISTORY: decrypted", decrypted.length, "messages");
         useChatStore.getState().setHistory(selectedUserId!, decrypted);
       } catch (err) {
         console.error("HISTORY load failed:", err);
@@ -175,6 +180,11 @@ export default function Chat() {
   };
 
   const handleSelect = (userId: string, username: string) => {
+    // Guard: never open a self-chat
+    if (userId === currentUser?.id) {
+      console.warn("Ignoring self-conversation:", userId);
+      return;
+    }
     setSelectedUserId(userId);
     setSelectedUsername(username);
     setSearchQuery("");
@@ -188,6 +198,13 @@ export default function Chat() {
 
   const handleSend = async () => {
     if (!selectedUserId || !messageInput.trim()) return;
+
+    // Guard: never send a message to yourself
+    if (selectedUserId === currentUser?.id) {
+      console.error("Cannot send a message to yourself");
+      return;
+    }
+
     const text = messageInput;
     setMessageInput("");
     await sendMessage(selectedUserId, text);
@@ -207,6 +224,11 @@ export default function Chat() {
     saveAvatar(currentUser.id, dataUrl);
     setAvatarVersion((v) => v + 1);
   };
+
+  // Hide any self-referential conversations
+  const safeConversations = conversations.filter(
+    (c) => c.recipientId !== currentUser?.id,
+  );
 
   return (
     <div
@@ -228,7 +250,6 @@ export default function Chat() {
           background: "#fff",
         }}
       >
-        {/* Profile header */}
         <div
           style={{
             padding: "12px 16px",
@@ -292,7 +313,6 @@ export default function Chat() {
           </button>
         </div>
 
-        {/* Search */}
         <div style={{ padding: "8px 12px", background: "#fff" }}>
           <input
             value={searchQuery}
@@ -310,7 +330,6 @@ export default function Chat() {
           />
         </div>
 
-        {/* List */}
         <div style={{ flex: 1, overflowY: "auto" }}>
           {searchQuery.trim() &&
             searchResults.map((u) => (
@@ -333,7 +352,7 @@ export default function Chat() {
               </div>
             ))}
 
-          {!searchQuery.trim() && conversations.length === 0 && (
+          {!searchQuery.trim() && safeConversations.length === 0 && (
             <div
               style={{
                 padding: "40px 20px",
@@ -349,7 +368,7 @@ export default function Chat() {
           )}
 
           {!searchQuery.trim() &&
-            conversations.map((c) => (
+            safeConversations.map((c) => (
               <div
                 key={c.recipientId}
                 onClick={() => handleSelect(c.recipientId, c.recipientUsername)}
@@ -405,7 +424,6 @@ export default function Chat() {
       >
         {selectedUserId ? (
           <>
-            {/* Header */}
             <div
               style={{
                 padding: "10px 16px",
@@ -438,7 +456,6 @@ export default function Chat() {
               </span>
             </div>
 
-            {/* Messages */}
             <div
               style={{
                 flex: 1,
@@ -522,7 +539,6 @@ export default function Chat() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
             <div
               style={{
                 padding: "10px 16px",
