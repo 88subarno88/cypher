@@ -94,7 +94,6 @@ export default function Chat() {
   const { sendMessage, isSending } = useEncryptedChat();
   const currentUser = useMyStore((s) => s.user);
 
-  // Connect socket once, keep it alive
   useEffect(() => {
     if (!socket.connected) socket.connect();
     const cleanup = registerHandlers();
@@ -103,9 +102,6 @@ export default function Chat() {
     };
   }, []);
 
-  // ── NEW: load existing conversations from the server on mount ──
-  // This rebuilds the sidebar from the database so chats persist
-  // across logins (not just while the tab stays open).
   useEffect(() => {
     async function loadConversations() {
       try {
@@ -124,12 +120,10 @@ export default function Chat() {
     loadConversations();
   }, []);
 
-  // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Load history when a conversation is selected
   useEffect(() => {
     if (!selectedUserId) return;
     async function load() {
@@ -156,7 +150,16 @@ export default function Chat() {
             console.warn("Skipping undecryptable message:", msg.id);
           }
         }
-        useChatStore.getState().setHistory(selectedUserId!, decrypted);
+        const current = useChatStore.getState().messages[selectedUserId!] ?? [];
+        const byId = new Map<string, DecryptedMessage>();
+        for (const m of [...decrypted, ...current]) {
+          byId.set(m.id, m);
+        }
+        const merged = Array.from(byId.values()).sort(
+          (a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+        );
+        useChatStore.getState().setHistory(selectedUserId!, merged);
       } catch (err) {
         console.error("HISTORY load failed:", err);
       } finally {
@@ -180,7 +183,6 @@ export default function Chat() {
   };
 
   const handleSelect = (userId: string, username: string) => {
-    // Guard: never open a self-chat
     if (userId === currentUser?.id) {
       console.warn("Ignoring self-conversation:", userId);
       return;
@@ -198,13 +200,10 @@ export default function Chat() {
 
   const handleSend = async () => {
     if (!selectedUserId || !messageInput.trim()) return;
-
-    // Guard: never send a message to yourself
     if (selectedUserId === currentUser?.id) {
       console.error("Cannot send a message to yourself");
       return;
     }
-
     const text = messageInput;
     setMessageInput("");
     await sendMessage(selectedUserId, text);
@@ -225,7 +224,6 @@ export default function Chat() {
     setAvatarVersion((v) => v + 1);
   };
 
-  // Hide any self-referential conversations
   const safeConversations = conversations.filter(
     (c) => c.recipientId !== currentUser?.id,
   );
@@ -452,7 +450,7 @@ export default function Chat() {
                   fontWeight: 500,
                 }}
               >
-                🔒 Encrypted
+                Chats are Encrypted
               </span>
             </div>
 
@@ -489,7 +487,12 @@ export default function Chat() {
                 </div>
               ) : (
                 messages.map((msg) => {
-                  const isMine = msg.senderId === currentUser?.id;
+                  // ── FIX: determine side using selectedUserId, NOT currentUser ──
+                  // selectedUserId is the OTHER person in this chat and is always
+                  // defined while viewing. If the message's sender is that other
+                  // person, it's theirs (left). Otherwise it's mine (right).
+                  // This does not break after a page reload (unlike currentUser).
+                  const isMine = msg.senderId !== selectedUserId;
                   const time = new Date(msg.timestamp).toLocaleTimeString([], {
                     hour: "2-digit",
                     minute: "2-digit",
