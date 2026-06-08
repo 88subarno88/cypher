@@ -6,6 +6,8 @@ import { useMyStore } from "../store/authStore";
 import { useEncryptedChat } from "../hooks/useEncryptedchat";
 import { fetchHistory, searchUsers, fetchConversations } from "../api/messages";
 import { decryptMessage } from "../crypto";
+import { decryptFile } from "../crypto/fileEncryption";
+import { downloadEncryptedFile } from "../api/files";
 import { registerHandlers } from "../socket/handlers";
 import socket from "../socket/socket";
 import { getAvatar, saveAvatar, fileToDataUrl } from "../utils/avatarStore";
@@ -72,6 +74,143 @@ function Avatar({
   );
 }
 
+// ── Renders a message body: text, image, video, or file link ──
+function MessageContent({ msg }: { msg: DecryptedMessage }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (msg.messageType !== "file") {
+    return (
+      <div
+        style={{ fontSize: "14px", wordBreak: "break-word", color: "#111b21" }}
+      >
+        {msg.plaintext}
+      </div>
+    );
+  }
+
+  async function loadFile() {
+    if (!msg.fileId || !msg.encryptedKey || !msg.iv) {
+      setError("This file is missing its decryption keys.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const privateKey = useCryptoStore.getState().keyPair?.privateKey;
+      if (!privateKey) {
+        setError("Your key isn't loaded. Log in again to view files.");
+        return;
+      }
+      let encrypted: ArrayBuffer;
+      try {
+        encrypted = await downloadEncryptedFile(msg.fileId);
+      } catch {
+        setError("Couldn't download the file. It may have been removed.");
+        return;
+      }
+      let decrypted: ArrayBuffer;
+      try {
+        decrypted = await decryptFile(
+          encrypted,
+          msg.encryptedKey,
+          msg.iv,
+          privateKey,
+        );
+      } catch {
+        setError("Couldn't decrypt this file.");
+        return;
+      }
+      const blob = new Blob([decrypted], {
+        type: msg.mimeType || "application/octet-stream",
+      });
+      setUrl(URL.createObjectURL(blob));
+    } catch (err) {
+      console.error("File load failed:", err);
+      setError("Something went wrong opening this file.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const isImage = !!msg.mimeType?.startsWith("image/");
+  const isVideo = !!msg.mimeType?.startsWith("video/");
+
+  if (error) {
+    return (
+      <div style={{ fontSize: "13px", color: "#b91c1c" }}>
+        ⚠️ {error}
+        <button
+          onClick={() => {
+            setError(null);
+            loadFile();
+          }}
+          style={{
+            marginLeft: "8px",
+            background: "none",
+            border: "none",
+            color: "#2563eb",
+            cursor: "pointer",
+            fontSize: "13px",
+            textDecoration: "underline",
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (url) {
+    if (isImage) {
+      return (
+        <img
+          src={url}
+          alt={msg.fileName}
+          style={{ maxWidth: "240px", borderRadius: "6px", display: "block" }}
+        />
+      );
+    }
+    if (isVideo) {
+      return (
+        <video
+          src={url}
+          controls
+          style={{ maxWidth: "260px", borderRadius: "6px", display: "block" }}
+        />
+      );
+    }
+    return (
+      <a
+        href={url}
+        download={msg.fileName}
+        style={{ color: "#2563eb", fontSize: "14px" }}
+      >
+        ⬇ {msg.fileName || "Download file"}
+      </a>
+    );
+  }
+
+  return (
+    <button
+      onClick={loadFile}
+      disabled={loading}
+      style={{
+        background: "none",
+        border: "1px dashed #9ca3af",
+        borderRadius: "6px",
+        padding: "8px 12px",
+        cursor: loading ? "wait" : "pointer",
+        fontSize: "13px",
+        color: "#374151",
+      }}
+    >
+      {loading ? "Decrypting..." : `📎 ${msg.fileName || "file"} — tap to view`}
+    </button>
+  );
+}
+
 export default function Chat() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedUsername, setSelectedUsername] = useState<string>("");
@@ -85,13 +224,14 @@ export default function Chat() {
 
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const attachInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const messages = useChatStore(
     (s) => s.messages[selectedUserId ?? ""] ?? EMPTY_MESSAGES,
   );
   const conversations = useChatStore((s) => s.conversations);
-  const { sendMessage, isSending } = useEncryptedChat();
+  const { sendMessage, sendFile, isSending, sendError } = useEncryptedChat();
   const currentUser = useMyStore((s) => s.user);
 
   useEffect(() => {
@@ -138,13 +278,23 @@ export default function Chat() {
         const decrypted: DecryptedMessage[] = [];
         for (const msg of encrypted) {
           try {
-            const plaintext = await decryptMessage(msg, privateKey);
+            // File messages have no text payload — carry their fields through
+            const isFile = (msg as any).messageType === "file";
+            const plaintext = isFile
+              ? ""
+              : await decryptMessage(msg, privateKey);
             decrypted.push({
               id: msg.id!,
               plaintext,
               senderId: msg.senderId,
               recipientId: msg.recipientId,
               timestamp: msg.createdAt ?? new Date().toISOString(),
+              messageType: (msg as any).messageType ?? "text",
+              fileId: (msg as any).fileId,
+              fileName: (msg as any).fileName,
+              mimeType: (msg as any).mimeType,
+              encryptedKey: msg.encryptedKey,
+              iv: msg.iv,
             });
           } catch {
             console.warn("Skipping undecryptable message:", msg.id);
@@ -214,6 +364,21 @@ export default function Chat() {
       lastMessage: text,
       lastMessageAt: new Date().toISOString(),
     });
+  };
+
+  // ── Send a file (image / video / doc) ──
+  const handleAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedUserId) return;
+    await sendFile(selectedUserId, file);
+    useChatStore.getState().addOrUpdateConversation({
+      id: selectedUserId,
+      recipientId: selectedUserId,
+      recipientUsername: selectedUsername,
+      lastMessage: "📎 " + file.name,
+      lastMessageAt: new Date().toISOString(),
+    });
+    e.target.value = ""; // reset so the same file can be re-picked
   };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -487,11 +652,6 @@ export default function Chat() {
                 </div>
               ) : (
                 messages.map((msg) => {
-                  // ── FIX: determine side using selectedUserId, NOT currentUser ──
-                  // selectedUserId is the OTHER person in this chat and is always
-                  // defined while viewing. If the message's sender is that other
-                  // person, it's theirs (left). Otherwise it's mine (right).
-                  // This does not break after a page reload (unlike currentUser).
                   const isMine = msg.senderId !== selectedUserId;
                   const time = new Date(msg.timestamp).toLocaleTimeString([], {
                     hour: "2-digit",
@@ -515,15 +675,7 @@ export default function Chat() {
                           boxShadow: "0 1px 0.5px rgba(0,0,0,0.13)",
                         }}
                       >
-                        <div
-                          style={{
-                            fontSize: "14px",
-                            wordBreak: "break-word",
-                            color: "#111b21",
-                          }}
-                        >
-                          {msg.plaintext}
-                        </div>
+                        <MessageContent msg={msg} />
                         <div
                           style={{
                             fontSize: "11px",
@@ -542,6 +694,21 @@ export default function Chat() {
               <div ref={messagesEndRef} />
             </div>
 
+            {/* Send-error banner */}
+            {sendError && (
+              <div
+                style={{
+                  padding: "8px 16px",
+                  background: "#fef2f2",
+                  color: "#991b1b",
+                  fontSize: "13px",
+                  borderTop: "1px solid #fee2e2",
+                }}
+              >
+                ⚠️ {sendError}
+              </div>
+            )}
+
             <div
               style={{
                 padding: "10px 16px",
@@ -551,6 +718,32 @@ export default function Chat() {
                 alignItems: "center",
               }}
             >
+              {/* Hidden file input + paperclip button */}
+              <input
+                ref={attachInputRef}
+                type="file"
+                onChange={handleAttach}
+                style={{ display: "none" }}
+              />
+              <button
+                onClick={() => attachInputRef.current?.click()}
+                disabled={isSending}
+                title="Attach a file"
+                style={{
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "50%",
+                  border: "none",
+                  background: "#e5e7eb",
+                  color: "#54656f",
+                  fontSize: "18px",
+                  cursor: isSending ? "not-allowed" : "pointer",
+                  flexShrink: 0,
+                }}
+              >
+                📎
+              </button>
+
               <input
                 value={messageInput}
                 onChange={(e) => setMessageInput(e.target.value)}
@@ -572,6 +765,7 @@ export default function Chat() {
                   background: "#fff",
                 }}
               />
+
               <button
                 onClick={handleSend}
                 disabled={isSending || !messageInput.trim()}

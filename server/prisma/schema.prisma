@@ -19,12 +19,17 @@ model User {
 
 model Message {
   id               String   @id @default(cuid())
-  encryptedPayload String
+  encryptedPayload String                         
   encryptedKey     String
   iv               String
   senderId         String
   recipientId      String
   createdAt        DateTime @default(now())
+  messageType      String   @default("text")      
+  fileId           String?                          
+  fileName         String?                          
+  mimeType         String?                         
+ 
   sender           User     @relation("Sender",    fields: [senderId],    references: [id])
   recipient        User     @relation("Recipient", fields: [recipientId], references: [id])
 }
