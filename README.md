@@ -14,11 +14,11 @@ A full-stack, end-to-end encrypted messaging app. Messages and files are encrypt
 ## How the encryption works
 
 ```
-SEND:  message/file → fresh AES-256-GCM key encrypts the content
-                     → AES key wrapped with recipient's RSA public key
-                     → server stores only ciphertext
+SEND:  message/file -> fresh AES-256-GCM key encrypts the content
+                     -> AES key wrapped with recipient's RSA public key
+                     -> server stores only ciphertext
 RECV:  recipient unwraps the AES key with their RSA private key
-                     → decrypts the content locally
+                     -> decrypts the content locally
 ```
 
 The server is a relay and a ciphertext store. It never holds any private key, so it can never decrypt anything.
