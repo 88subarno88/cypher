@@ -9,14 +9,12 @@ import { useMyStore } from "../store/authStore";
 import socket from "../socket/socket";
 import type { SendMessagePayload } from "../../../shared/src";
 
-// Keep in sync with the server limit in routes/files.ts
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
 export function useEncryptedChat() {
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
 
-  // Send a TEXT message 
   const sendMessage = useCallback(
     async (recipientId: string, plaintext: string) => {
       if (!plaintext.trim()) return;
@@ -26,13 +24,12 @@ export function useEncryptedChat() {
         const publicKeyB64 = await fetchPublicKey(recipientId);
         const recipientPublicKey = await importPublicKey(publicKeyB64);
         const encrypted = await encryptMessage(plaintext, recipientPublicKey);
-        const payload: SendMessagePayload = {
+        socket.emit("message:send", {
           encryptedPayload: encrypted.encryptedPayload,
           encryptedKey: encrypted.encryptedKey,
           iv: encrypted.iv,
           recipientId,
-        };
-        socket.emit("message:send", payload);
+        } as SendMessagePayload);
 
         const currentUser = useMyStore.getState().user;
         if (currentUser) {
@@ -54,19 +51,12 @@ export function useEncryptedChat() {
     [],
   );
 
-  //Send a FILE message (with full error handling)
   const sendFile = useCallback(async (recipientId: string, file: File) => {
     setSendError(null);
-
-    // ── GUARD 1: empty file ──
     if (file.size === 0) {
-      setSendError("That file is empty and can't be sent.");
+      setSendError("That file is empty.");
       return;
     }
-
-    // size check BEFORE encrypting/uploading
-    // Catch oversize files locally so we don't waste time + memory
-    // encrypting a huge file only for the server to reject it.
     if (file.size > MAX_FILE_SIZE) {
       const mb = (file.size / (1024 * 1024)).toFixed(1);
       setSendError(`File is too large (${mb} MB). Maximum is 50 MB.`);
@@ -75,16 +65,14 @@ export function useEncryptedChat() {
 
     setIsSending(true);
     try {
-      // 1. Read file as bytes
       let fileBytes: ArrayBuffer;
       try {
         fileBytes = await file.arrayBuffer();
       } catch {
-        setSendError("Could not read that file. It may be corrupted.");
+        setSendError("Could not read that file.");
         return;
       }
 
-      // Encrypt with recipient's public key
       const publicKeyB64 = await fetchPublicKey(recipientId);
       const recipientPublicKey = await importPublicKey(publicKeyB64);
       const { encryptedData, encryptedKey, iv } = await encryptFile(
@@ -92,24 +80,26 @@ export function useEncryptedChat() {
         recipientPublicKey,
       );
 
-      //Upload the encrypted blob
       let fileId: string;
       try {
         fileId = await uploadEncryptedFile(encryptedData);
       } catch (err: any) {
-        // Server may reject with 413 (too large) or 500
-        if (err?.response?.status === 413) {
-          setSendError("File is too large. Maximum is 50 MB.");
-        } else {
-          setSendError("Upload failed. Check your connection and try again.");
-        }
-        console.error("Upload error:", err);
+        setSendError(
+          err?.response?.status === 413
+            ? "File is too large. Maximum is 50 MB."
+            : "Upload failed. Check your connection and try again.",
+        );
         return;
       }
 
-      // Emit the file message
       const mimeType = file.type || "application/octet-stream";
-      const payload: any = {
+
+      // Build a local blob URL the SENDER can view directly.
+      const localUrl = URL.createObjectURL(
+        new Blob([fileBytes], { type: mimeType }),
+      );
+
+      socket.emit("message:send", {
         encryptedPayload: "",
         encryptedKey,
         iv,
@@ -118,14 +108,16 @@ export function useEncryptedChat() {
         fileId,
         fileName: file.name,
         mimeType,
-      };
-      socket.emit("message:send", payload);
+      } as any);
 
-      //Optimistic add on sender side
+      // ── OPTIMISTIC ADD with the REAL fileId + localUrl. ──
+      // Using fileId as the message id means the server relay (which we
+      // skip for our own messages) can't create a duplicate, and the
+      // sender sees their own image immediately via localUrl.
       const currentUser = useMyStore.getState().user;
       if (currentUser) {
         useChatStore.getState().addMessage(recipientId, {
-          id: Date.now().toString(),
+          id: fileId, // ← use fileId as the id (stable, unique)
           plaintext: "",
           senderId: currentUser.id,
           recipientId,
@@ -136,6 +128,7 @@ export function useEncryptedChat() {
           mimeType,
           encryptedKey,
           iv,
+          localUrl,
         });
       }
     } catch (err: any) {

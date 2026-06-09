@@ -8,6 +8,7 @@ import { fetchHistory, searchUsers, fetchConversations } from "../api/messages";
 import { decryptMessage } from "../crypto";
 import { decryptFile } from "../crypto/fileEncryption";
 import { downloadEncryptedFile } from "../api/files";
+import { getLocalFile } from "../utils/localFileCache";
 import { registerHandlers } from "../socket/handlers";
 import socket from "../socket/socket";
 import { getAvatar, saveAvatar, fileToDataUrl } from "../utils/avatarStore";
@@ -80,6 +81,7 @@ function MessageContent({ msg }: { msg: DecryptedMessage }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Plain text message
   if (msg.messageType !== "file") {
     return (
       <div
@@ -87,6 +89,44 @@ function MessageContent({ msg }: { msg: DecryptedMessage }) {
       >
         {msg.plaintext}
       </div>
+    );
+  }
+
+  // ── SENDER's own copy: if a local blob is cached for this fileId,
+  //    show it directly (no download, no decrypt). The recipient has
+  //    no cache entry, so they fall through to download + decrypt. ──
+  const localCopy =
+    (msg as any).localUrl ||
+    (msg.fileId ? getLocalFile(msg.fileId) : undefined);
+  if (localCopy) {
+    const isImg = !!msg.mimeType?.startsWith("image/");
+    const isVid = !!msg.mimeType?.startsWith("video/");
+    if (isImg) {
+      return (
+        <img
+          src={localCopy}
+          alt={msg.fileName}
+          style={{ maxWidth: "240px", borderRadius: "6px", display: "block" }}
+        />
+      );
+    }
+    if (isVid) {
+      return (
+        <video
+          src={localCopy}
+          controls
+          style={{ maxWidth: "260px", borderRadius: "6px", display: "block" }}
+        />
+      );
+    }
+    return (
+      <a
+        href={localCopy}
+        download={msg.fileName}
+        style={{ color: "#2563eb", fontSize: "14px" }}
+      >
+        ⬇ {msg.fileName || "Download file"}
+      </a>
     );
   }
 
@@ -118,7 +158,8 @@ function MessageContent({ msg }: { msg: DecryptedMessage }) {
           msg.iv,
           privateKey,
         );
-      } catch {
+      } catch (err) {
+        console.error("DECRYPT FILE ERROR:", err);
         setError("Couldn't decrypt this file.");
         return;
       }
@@ -278,7 +319,6 @@ export default function Chat() {
         const decrypted: DecryptedMessage[] = [];
         for (const msg of encrypted) {
           try {
-            // File messages have no text payload — carry their fields through
             const isFile = (msg as any).messageType === "file";
             const plaintext = isFile
               ? ""
@@ -302,7 +342,11 @@ export default function Chat() {
         }
         const current = useChatStore.getState().messages[selectedUserId!] ?? [];
         const byId = new Map<string, DecryptedMessage>();
-        for (const m of [...decrypted, ...current]) {
+        // current first; keep an existing entry that already has a localUrl
+        // (the sender's own viewable file copy) instead of overwriting it.
+        for (const m of [...current, ...decrypted]) {
+          const existing = byId.get(m.id);
+          if (existing && (existing as any).localUrl) continue;
           byId.set(m.id, m);
         }
         const merged = Array.from(byId.values()).sort(
@@ -366,7 +410,6 @@ export default function Chat() {
     });
   };
 
-  // ── Send a file (image / video / doc) ──
   const handleAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedUserId) return;
@@ -378,7 +421,7 @@ export default function Chat() {
       lastMessage: "📎 " + file.name,
       lastMessageAt: new Date().toISOString(),
     });
-    e.target.value = ""; // reset so the same file can be re-picked
+    e.target.value = "";
   };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -652,7 +695,8 @@ export default function Chat() {
                 </div>
               ) : (
                 messages.map((msg) => {
-                  const isMine = msg.senderId !== selectedUserId;
+                  const myId = currentUser?.id;
+                  const isMine = msg.senderId === myId;
                   const time = new Date(msg.timestamp).toLocaleTimeString([], {
                     hour: "2-digit",
                     minute: "2-digit",
@@ -694,7 +738,6 @@ export default function Chat() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Send-error banner */}
             {sendError && (
               <div
                 style={{
@@ -718,7 +761,6 @@ export default function Chat() {
                 alignItems: "center",
               }}
             >
-              {/* Hidden file input + paperclip button */}
               <input
                 ref={attachInputRef}
                 type="file"

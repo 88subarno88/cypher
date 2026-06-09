@@ -21,26 +21,28 @@ async function getUsername(userId: string): Promise<string> {
 }
 
 export function registerHandlers() {
+  console.log("HANDLERS VERSION: simple-skip-own");
+
   socket.on("message:receive", async (payload: EncryptedMessage) => {
     const currentUserId = useMyStore.getState().user?.id;
 
-    // Skip my own relayed messages (already added optimistically)
+    // ── Skip ALL of my own relayed messages (text AND file). ──
+    // The sender already added an optimistic copy (text via sendMessage,
+    // file via sendFile with localUrl). Processing the relay would dupe.
     if (payload.senderId === currentUserId) {
       return;
     }
 
-    const keyPair = useCryptoStore.getState().keyPair;
-    const privateKey = keyPair?.privateKey;
-    if (!privateKey) {
-      console.error("No private key — cannot decrypt");
-      return;
-    }
+    const isFile = payload.messageType === "file";
 
     try {
-      // For text: decrypt the payload. For file: no text payload.
-      const isFile = payload.messageType === "file";
       let plaintext = "";
       if (!isFile) {
+        const privateKey = useCryptoStore.getState().keyPair?.privateKey;
+        if (!privateKey) {
+          console.error("No private key — cannot decrypt");
+          return;
+        }
         plaintext = await decryptMessage(payload, privateKey);
       }
 
@@ -50,7 +52,6 @@ export function registerHandlers() {
         senderId: payload.senderId,
         recipientId: payload.recipientId,
         timestamp: payload.createdAt ?? new Date().toISOString(),
-        //carry file fields so the UI can render the file
         messageType: payload.messageType ?? "text",
         fileId: payload.fileId,
         fileName: payload.fileName,
@@ -59,12 +60,11 @@ export function registerHandlers() {
         iv: payload.iv,
       };
 
+      // I received this → the other person is the sender.
       const otherUserId = payload.senderId;
       useChatStore.getState().addMessage(otherUserId, decrypted);
 
-      // Conversation preview: text for text messages, filename for files
       const preview = isFile ? "📎 " + (payload.fileName ?? "file") : plaintext;
-
       const otherUsername = await getUsername(otherUserId);
       useChatStore.getState().addOrUpdateConversation({
         id: otherUserId,
@@ -73,8 +73,8 @@ export function registerHandlers() {
         lastMessage: preview,
         lastMessageAt: decrypted.timestamp,
       });
-    } catch {
-      console.error("Failed to decrypt incoming message");
+    } catch (err) {
+      console.error("Failed to handle incoming message", err);
     }
   });
 

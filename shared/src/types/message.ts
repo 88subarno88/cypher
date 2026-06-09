@@ -27,6 +27,7 @@ export interface DecryptedMessage {
   mimeType?: string;
   encryptedKey?: string;
   iv?: string;
+  localUrl?: string;
 }
 
 export interface EncryptedMessage {
