@@ -52,26 +52,30 @@ export default function LoginForm() {
     }
   };
 
+  // Underline-style inputs — editorial, not boxy
   const inputStyle = (name: string) => ({
     width: "100%",
-    padding: "12px 14px",
-    fontSize: "15px",
-    borderRadius: "10px",
-    border: `1.5px solid ${focused === name ? "#6366F1" : "#e2e8f0"}`,
+    padding: "13px 2px",
+    fontSize: "21px",
+    border: "none",
+    borderBottom: `2px solid ${focused === name ? "#1a1a1a" : "#d9d4c8"}`,
     outline: "none",
-    background: "#f8fafc",
-    color: "#0f172a",
-    transition: "border-color 0.15s, box-shadow 0.15s",
-    boxShadow: focused === name ? "0 0 0 3px rgba(99,102,241,0.15)" : "none",
+    background: "transparent",
+    color: "#1a1a1a",
+    transition: "border-color 0.2s",
     boxSizing: "border-box" as const,
+    fontFamily: "inherit",
   });
 
   const labelStyle = {
     display: "block",
-    fontSize: "13px",
+    fontSize: "14px",
     fontWeight: 600,
-    color: "#475569",
-    marginBottom: "6px",
+    letterSpacing: "0.14em",
+    textTransform: "uppercase" as const,
+    color: "#8a8273",
+    marginBottom: "4px",
+    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
   };
 
   return (
@@ -79,76 +83,91 @@ export default function LoginForm() {
       style={{
         minHeight: "100vh",
         width: "100vw",
+        background: "#faf8f3",
+        color: "#1a1a1a",
         display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background:
-          "linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #6366F1 100%)",
-        padding: "20px",
         boxSizing: "border-box",
+        fontFamily:
+          "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
       }}
     >
+      {/* ════ LEFT COLUMN — form ════ */}
       <div
         style={{
-          width: "100%",
-          maxWidth: "400px",
-          background: "#fff",
-          borderRadius: "20px",
-          padding: "40px 36px",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+          width: "950px",
+          flexShrink: 0,
+          padding: "52px 72px 42px",
+          display: "flex",
+          flexDirection: "column",
+          boxSizing: "border-box",
+          borderRight: "1px solid #e8e3d8",
         }}
       >
-        {/* Brand */}
-        <div style={{ textAlign: "center", marginBottom: "28px" }}>
-          <div
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: "16px",
-              background: "linear-gradient(135deg, #6366F1, #8B5CF6)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              margin: "0 auto 14px",
-              fontSize: 28,
-            }}
-          >
-            🔐
-          </div>
-          <h1
-            style={{
-              margin: 0,
-              fontSize: "24px",
-              fontWeight: 700,
-              color: "#0f172a",
-            }}
-          >
-            Welcome back
-          </h1>
-          <p style={{ margin: "6px 0 0", fontSize: "14px", color: "#64748b" }}>
-            Sign in to your encrypted Cipher account
-          </p>
+        {/* ── Logo slot: replace this block with your logo ── */}
+        <div
+          style={{
+            width: "120px",
+            height: "44px",
+            border: "1.5px dashed #c9c2b2",
+            borderRadius: "6px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "10px",
+            letterSpacing: "0.1em",
+            color: "#b3ab99",
+            fontFamily: "ui-monospace, monospace",
+            marginBottom: "90px",
+          }}
+        >
+          YOUR LOGO
         </div>
+
+        <h1
+          style={{
+            fontFamily: "Georgia, 'Times New Roman', serif",
+            fontSize: "clamp(46px, 4vw, 58px)",
+            fontWeight: 400,
+            lineHeight: 1.08,
+            letterSpacing: "-0.02em",
+            margin: "0 0 16px",
+          }}
+        >
+          Open your
+          <br />
+          keyring.
+        </h1>
+        <p
+          style={{
+            fontSize: "18px",
+            color: "#6f6a5e",
+            margin: "0 0 56px",
+            lineHeight: 1.6,
+          }}
+        >
+          Your password unlocks the private key stored on this device. It never
+          travels anywhere.
+        </p>
 
         {error && (
           <div
             style={{
-              background: "#fef2f2",
-              color: "#991b1b",
-              padding: "11px 14px",
-              borderRadius: "10px",
-              fontSize: "13px",
-              marginBottom: "18px",
-              border: "1px solid #fee2e2",
+              borderLeft: "3px solid #b3433a",
+              background: "#f8ece9",
+              color: "#7c2d25",
+              padding: "13px 18px",
+              fontSize: "17px",
+              lineHeight: 1.5,
+              marginBottom: "30px",
             }}
           >
-            ⚠️ {error}
+            {error}
           </div>
         )}
 
         <form
           onSubmit={handleSubmit}
-          style={{ display: "flex", flexDirection: "column", gap: "16px" }}
+          style={{ display: "flex", flexDirection: "column", gap: "36px" }}
         >
           <div>
             <label htmlFor="username" style={labelStyle}>
@@ -161,7 +180,6 @@ export default function LoginForm() {
               onChange={(e) => setUsername(e.target.value)}
               onFocus={() => setFocused("username")}
               onBlur={() => setFocused(null)}
-              placeholder="Enter your username"
               required
               style={inputStyle("username")}
             />
@@ -178,7 +196,6 @@ export default function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               onFocus={() => setFocused("password")}
               onBlur={() => setFocused(null)}
-              placeholder="Enter your password"
               required
               style={inputStyle("password")}
             />
@@ -188,56 +205,191 @@ export default function LoginForm() {
             type="submit"
             disabled={isLoading}
             style={{
-              marginTop: "6px",
-              padding: "13px",
-              fontSize: "15px",
+              marginTop: "18px",
+              padding: "18px",
+              fontSize: "18px",
               fontWeight: 600,
-              color: "#fff",
+              letterSpacing: "0.08em",
+              color: "#faf8f3",
+              background: isLoading ? "#8a8273" : "#1a1a1a",
               border: "none",
-              borderRadius: "10px",
-              cursor: isLoading ? "not-allowed" : "pointer",
-              background: isLoading
-                ? "#a5b4fc"
-                : "linear-gradient(135deg, #6366F1, #8B5CF6)",
-              boxShadow: "0 4px 14px rgba(99,102,241,0.4)",
-              transition: "opacity 0.15s",
+              cursor: isLoading ? "wait" : "pointer",
+              alignSelf: "stretch",
             }}
           >
-            {isLoading ? "Signing in..." : "Sign in"}
+            {isLoading ? "Unlocking…" : "Sign in →"}
           </button>
         </form>
 
-        <p
-          style={{
-            textAlign: "center",
-            marginTop: "22px",
-            fontSize: "14px",
-            color: "#64748b",
-          }}
-        >
-          Don't have an account?{" "}
+        <p style={{ fontSize: "17px", color: "#6f6a5e", marginTop: "36px" }}>
+          New here?{" "}
           <Link
             to="/register"
             style={{
-              color: "#6366F1",
+              color: "#1a1a1a",
               fontWeight: 600,
-              textDecoration: "none",
+              textDecoration: "underline",
             }}
           >
-            Create one
+            Create an account
           </Link>
         </p>
 
+        <div style={{ flex: 1 }} />
+
         <p
           style={{
-            textAlign: "center",
-            marginTop: "18px",
-            fontSize: "11px",
-            color: "#94a3b8",
+            fontSize: "14px",
+            letterSpacing: "0.08em",
+            color: "#b3ab99",
+            fontFamily: "ui-monospace, monospace",
+            margin: 0,
           }}
         >
-          End-to-end encrypted. Your keys never leave this device.
+          RSA-OAEP 4096 · AES-256-GCM · zero-knowledge server
         </p>
+      </div>
+
+      {/* ════ RIGHT PANEL — the cipher itself, as decoration ════ */}
+      <div
+        style={{
+          flex: 1,
+          padding: "52px 83px",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          boxSizing: "border-box",
+          minWidth: 0,
+        }}
+      >
+        <div style={{ maxWidth: "832px" }}>
+          <p
+            style={{
+              fontSize: "14px",
+              letterSpacing: "0.16em",
+              color: "#8a8273",
+              fontFamily: "ui-monospace, monospace",
+              margin: "0 0 18px",
+            }}
+          >
+            WHAT YOU WRITE
+          </p>
+          <p
+            style={{
+              fontFamily: "Georgia, serif",
+              fontSize: "39px",
+              lineHeight: 1.4,
+              letterSpacing: "-0.01em",
+              margin: "0 0 52px",
+              color: "#1a1a1a",
+            }}
+          >
+            "meet me at the old library, six o'clock."
+          </p>
+
+          <p
+            style={{
+              fontSize: "14px",
+              letterSpacing: "0.16em",
+              color: "#8a8273",
+              fontFamily: "ui-monospace, monospace",
+              margin: "0 0 18px",
+            }}
+          >
+            WHAT THE SERVER STORES
+          </p>
+          <p
+            style={{
+              fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+              fontSize: "19px",
+              lineHeight: 1.9,
+              margin: 0,
+              color: "#a39b87",
+              wordBreak: "break-all",
+            }}
+          >
+            kQ7vXm2RZpL9aHc4Tf8wJn3BdYs6UeGi1oM5NxA0PrVbCt
+            EHqzD2fK8mWy4LgS7jR1nXv9TaQ6ZoB3cPeU5IdMwhF0kN
+            r2sGxJ8VbT4mYqA7LpEzCi6WnH3fKdR9oS1uM5XgNjQ0Pe
+          </p>
+
+          <div
+            style={{
+              marginTop: "73px",
+              paddingTop: "31px",
+              borderTop: "1px solid #e8e3d8",
+              display: "flex",
+              gap: "62px",
+            }}
+          >
+            <div>
+              <p
+                style={{
+                  fontFamily: "Georgia, serif",
+                  fontSize: "29px",
+                  margin: "0 0 6px",
+                }}
+              >
+                600,000
+              </p>
+              <p
+                style={{
+                  fontSize: "14px",
+                  letterSpacing: "0.08em",
+                  color: "#8a8273",
+                  margin: 0,
+                  fontFamily: "ui-monospace, monospace",
+                }}
+              >
+                PBKDF2 ITERATIONS
+              </p>
+            </div>
+            <div>
+              <p
+                style={{
+                  fontFamily: "Georgia, serif",
+                  fontSize: "29px",
+                  margin: "0 0 6px",
+                }}
+              >
+                4096-bit
+              </p>
+              <p
+                style={{
+                  fontSize: "14px",
+                  letterSpacing: "0.08em",
+                  color: "#8a8273",
+                  margin: 0,
+                  fontFamily: "ui-monospace, monospace",
+                }}
+              >
+                RSA KEY PAIR
+              </p>
+            </div>
+            <div>
+              <p
+                style={{
+                  fontFamily: "Georgia, serif",
+                  fontSize: "29px",
+                  margin: "0 0 6px",
+                }}
+              >
+                0
+              </p>
+              <p
+                style={{
+                  fontSize: "14px",
+                  letterSpacing: "0.08em",
+                  color: "#8a8273",
+                  margin: 0,
+                  fontFamily: "ui-monospace, monospace",
+                }}
+              >
+                KEYS ON THE SERVER
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

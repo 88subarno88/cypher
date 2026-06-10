@@ -843,7 +843,7 @@ export default function Chat() {
               background: "#f0f2f5",
             }}
           >
-            <div style={{ fontSize: "64px" }}>🔐</div>
+            <div style={{ fontSize: "64px" }}></div>
             <div
               style={{ fontSize: "22px", fontWeight: 300, color: "#41525d" }}
             >
@@ -853,7 +853,7 @@ export default function Chat() {
               Select a chat or search for a user to begin
             </div>
             <div style={{ fontSize: "12px", marginTop: "8px" }}>
-              🔒 Your messages are end-to-end encrypted
+              Your messages are end-to-end encrypted
             </div>
           </div>
         )}
