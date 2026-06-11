@@ -16,6 +16,20 @@ import type { DecryptedMessage } from "../../../shared/src/types/message";
 
 const EMPTY_MESSAGES: DecryptedMessage[] = [];
 
+// ── Shared design tokens — same palette as the login / register pages ──
+const ink = "#1a1a1a";
+const muted = "#6f6a5e";
+const faint = "#8a8273";
+const faintest = "#b3ab99";
+const line = "#e8e3d8";
+const cream = "#faf8f3";
+const paper = "#f3efe6";
+const cardBg = "#fffdf9";
+const serif = "Georgia, 'Times New Roman', serif";
+const mono = "ui-monospace, 'SF Mono', Menlo, monospace";
+const sans =
+  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+
 function Avatar({
   userId,
   username,
@@ -26,13 +40,14 @@ function Avatar({
   size?: number;
 }) {
   const pic = getAvatar(userId);
+  // Muted, earthy tones that sit well on the cream canvas
   const colours = [
-    "#6366F1",
-    "#8B5CF6",
-    "#EC4899",
-    "#F59E0B",
-    "#10B981",
-    "#06B6D4",
+    "#8a8273",
+    "#9b8568",
+    "#7c6f5a",
+    "#a38a6a",
+    "#6f6a5e",
+    "#9c7a63",
   ];
   let hash = 0;
   for (let i = 0; i < username.length; i++)
@@ -61,12 +76,13 @@ function Avatar({
         height: size,
         borderRadius: "50%",
         background: colour,
-        color: "white",
+        color: cream,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         fontSize: size * 0.4,
         fontWeight: 600,
+        fontFamily: serif,
         flexShrink: 0,
       }}
     >
@@ -76,16 +92,30 @@ function Avatar({
 }
 
 // ── Renders a message body: text, image, video, or file link ──
-function MessageContent({ msg }: { msg: DecryptedMessage }) {
+function MessageContent({
+  msg,
+  isMine,
+}: {
+  msg: DecryptedMessage;
+  isMine: boolean;
+}) {
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const bodyColor = isMine ? cream : ink;
+  const linkColor = isMine ? cream : ink;
 
   // Plain text message
   if (msg.messageType !== "file") {
     return (
       <div
-        style={{ fontSize: "14px", wordBreak: "break-word", color: "#111b21" }}
+        style={{
+          fontSize: "15px",
+          lineHeight: 1.5,
+          wordBreak: "break-word",
+          color: bodyColor,
+        }}
       >
         {msg.plaintext}
       </div>
@@ -123,9 +153,13 @@ function MessageContent({ msg }: { msg: DecryptedMessage }) {
       <a
         href={localCopy}
         download={msg.fileName}
-        style={{ color: "#2563eb", fontSize: "14px" }}
+        style={{
+          color: linkColor,
+          fontSize: "14px",
+          textDecoration: "underline",
+        }}
       >
-        ⬇ {msg.fileName || "Download file"}
+        ↓ {msg.fileName || "Download file"}
       </a>
     );
   }
@@ -180,8 +214,8 @@ function MessageContent({ msg }: { msg: DecryptedMessage }) {
 
   if (error) {
     return (
-      <div style={{ fontSize: "13px", color: "#b91c1c" }}>
-        ⚠️ {error}
+      <div style={{ fontSize: "13px", color: isMine ? "#f3b0a8" : "#b3433a" }}>
+        ⚠ {error}
         <button
           onClick={() => {
             setError(null);
@@ -191,7 +225,7 @@ function MessageContent({ msg }: { msg: DecryptedMessage }) {
             marginLeft: "8px",
             background: "none",
             border: "none",
-            color: "#2563eb",
+            color: linkColor,
             cursor: "pointer",
             fontSize: "13px",
             textDecoration: "underline",
@@ -226,9 +260,13 @@ function MessageContent({ msg }: { msg: DecryptedMessage }) {
       <a
         href={url}
         download={msg.fileName}
-        style={{ color: "#2563eb", fontSize: "14px" }}
+        style={{
+          color: linkColor,
+          fontSize: "14px",
+          textDecoration: "underline",
+        }}
       >
-        ⬇ {msg.fileName || "Download file"}
+        ↓ {msg.fileName || "Download file"}
       </a>
     );
   }
@@ -239,15 +277,16 @@ function MessageContent({ msg }: { msg: DecryptedMessage }) {
       disabled={loading}
       style={{
         background: "none",
-        border: "1px dashed #9ca3af",
+        border: `1px dashed ${isMine ? "rgba(250,248,243,0.4)" : "#c9c2b2"}`,
         borderRadius: "6px",
         padding: "8px 12px",
         cursor: loading ? "wait" : "pointer",
         fontSize: "13px",
-        color: "#374151",
+        color: isMine ? cream : muted,
+        fontFamily: mono,
       }}
     >
-      {loading ? "Decrypting..." : `📎 ${msg.fileName || "file"} — tap to view`}
+      {loading ? "Decrypting…" : `↟ ${msg.fileName || "file"} — tap to view`}
     </button>
   );
 }
@@ -418,7 +457,7 @@ export default function Chat() {
       id: selectedUserId,
       recipientId: selectedUserId,
       recipientUsername: selectedUsername,
-      lastMessage: "📎 " + file.name,
+      lastMessage: "↟ " + file.name,
       lastMessageAt: new Date().toISOString(),
     });
     e.target.value = "";
@@ -436,34 +475,45 @@ export default function Chat() {
     (c) => c.recipientId !== currentUser?.id,
   );
 
+  // Small reusable label style — the tracked monospace caption from the auth pages
+  const eyebrow = {
+    fontSize: "10px",
+    letterSpacing: "0.14em",
+    textTransform: "uppercase" as const,
+    color: faint,
+    fontFamily: mono,
+    fontWeight: 600,
+  };
+
   return (
     <div
       style={{
         display: "flex",
         height: "100vh",
         width: "100vw",
-        background: "#fff",
+        background: cream,
+        color: ink,
+        fontFamily: sans,
       }}
     >
       {/* ══ LEFT SIDEBAR ══ */}
       <div
         style={{
-          width: "340px",
+          width: "360px",
           flexShrink: 0,
-          borderRight: "1px solid #e9edef",
+          borderRight: `1px solid ${line}`,
           display: "flex",
           flexDirection: "column",
-          background: "#fff",
+          background: cream,
         }}
       >
         <div
           style={{
-            padding: "12px 16px",
-            background: "#f0f2f5",
+            padding: "16px 20px",
             display: "flex",
             alignItems: "center",
-            gap: "12px",
-            borderBottom: "1px solid #e9edef",
+            gap: "14px",
+            borderBottom: `1px solid ${line}`,
           }}
         >
           <div
@@ -474,25 +524,26 @@ export default function Chat() {
               key={avatarVersion}
               userId={currentUser?.id ?? ""}
               username={currentUser?.username ?? "?"}
-              size={40}
+              size={42}
             />
             <div
               style={{
                 position: "absolute",
                 bottom: -2,
                 right: -2,
-                background: "#6366F1",
+                background: ink,
                 borderRadius: "50%",
-                width: 16,
-                height: 16,
+                width: 17,
+                height: 17,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: 9,
-                border: "2px solid #f0f2f5",
+                color: cream,
+                border: `2px solid ${cream}`,
               }}
             >
-              📷
+              ✎
             </div>
           </div>
           <input
@@ -502,36 +553,48 @@ export default function Chat() {
             onChange={handleAvatarUpload}
             style={{ display: "none" }}
           />
-          <div style={{ flex: 1, fontWeight: 600, fontSize: "15px" }}>
+          <div
+            style={{
+              flex: 1,
+              fontFamily: serif,
+              fontWeight: 400,
+              fontSize: "19px",
+              letterSpacing: "-0.01em",
+            }}
+          >
             {currentUser?.username}
           </div>
           <button
             onClick={() => navigate("/settings")}
+            title="Settings"
             style={{
               background: "none",
               border: "none",
-              fontSize: "18px",
+              fontSize: "16px",
               cursor: "pointer",
-              color: "#54656f",
+              color: faint,
             }}
           >
-            ⚙️
+            ⚙
           </button>
         </div>
 
-        <div style={{ padding: "8px 12px", background: "#fff" }}>
+        <div style={{ padding: "14px 16px 10px" }}>
           <input
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
-            placeholder="Search or start new chat"
+            placeholder="Search or start a new chat"
             style={{
               width: "100%",
-              padding: "8px 14px",
-              background: "#f0f2f5",
-              border: "none",
-              borderRadius: "8px",
+              padding: "11px 16px",
+              background: paper,
+              border: `1px solid ${line}`,
+              borderRadius: "10px",
               fontSize: "14px",
+              color: ink,
               outline: "none",
+              fontFamily: sans,
+              boxSizing: "border-box",
             }}
           />
         </div>
@@ -543,16 +606,16 @@ export default function Chat() {
                 key={u.id}
                 onClick={() => handleSelect(u.id, u.username)}
                 style={{
-                  padding: "10px 16px",
+                  padding: "12px 20px",
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
-                  gap: "12px",
-                  borderBottom: "1px solid #f5f6f6",
+                  gap: "14px",
+                  borderBottom: `1px solid ${line}`,
                 }}
               >
                 <Avatar userId={u.id} username={u.username} />
-                <span style={{ fontSize: "15px", fontWeight: 500 }}>
+                <span style={{ fontSize: "16px", fontWeight: 500 }}>
                   {u.username}
                 </span>
               </div>
@@ -561,15 +624,16 @@ export default function Chat() {
           {!searchQuery.trim() && safeConversations.length === 0 && (
             <div
               style={{
-                padding: "40px 20px",
+                padding: "48px 24px",
                 textAlign: "center",
-                color: "#8696a0",
+                color: faint,
                 fontSize: "14px",
+                lineHeight: 1.7,
               }}
             >
               No chats yet.
               <br />
-              Search to start a conversation.
+              Search above to start a conversation.
             </div>
           )}
 
@@ -579,16 +643,18 @@ export default function Chat() {
                 key={c.recipientId}
                 onClick={() => handleSelect(c.recipientId, c.recipientUsername)}
                 style={{
-                  padding: "10px 16px",
+                  padding: "13px 20px",
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
-                  gap: "12px",
+                  gap: "14px",
                   background:
+                    selectedUserId === c.recipientId ? paper : "transparent",
+                  borderBottom: `1px solid ${line}`,
+                  borderLeft:
                     selectedUserId === c.recipientId
-                      ? "#f0f2f5"
-                      : "transparent",
-                  borderBottom: "1px solid #f5f6f6",
+                      ? `2px solid ${ink}`
+                      : "2px solid transparent",
                 }}
               >
                 <Avatar
@@ -597,17 +663,25 @@ export default function Chat() {
                   size={48}
                 />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 500, fontSize: "16px" }}>
+                  <div
+                    style={{
+                      fontFamily: serif,
+                      fontWeight: 400,
+                      fontSize: "17px",
+                      letterSpacing: "-0.01em",
+                    }}
+                  >
                     {c.recipientUsername}
                   </div>
                   {c.lastMessage && (
                     <div
                       style={{
                         fontSize: "13px",
-                        color: "#667781",
+                        color: muted,
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
+                        marginTop: "2px",
                       }}
                     >
                       {c.lastMessage}
@@ -617,6 +691,19 @@ export default function Chat() {
               </div>
             ))}
         </div>
+
+        <div
+          style={{
+            padding: "14px 20px",
+            borderTop: `1px solid ${line}`,
+            ...eyebrow,
+            fontSize: "10px",
+            letterSpacing: "0.1em",
+            color: faintest,
+          }}
+        >
+          RSA-OAEP 4096 · AES-256-GCM
+        </div>
       </div>
 
       {/* ══ RIGHT PANEL ══ */}
@@ -625,40 +712,48 @@ export default function Chat() {
           flex: 1,
           display: "flex",
           flexDirection: "column",
-          background: "#efeae2",
+          background: paper,
         }}
       >
         {selectedUserId ? (
           <>
             <div
               style={{
-                padding: "10px 16px",
-                background: "#f0f2f5",
+                padding: "14px 24px",
+                background: cream,
                 display: "flex",
                 alignItems: "center",
-                gap: "12px",
-                borderBottom: "1px solid #e9edef",
+                gap: "14px",
+                borderBottom: `1px solid ${line}`,
               }}
             >
               <Avatar
                 userId={selectedUserId}
                 username={selectedUsername}
-                size={40}
+                size={42}
               />
-              <div style={{ flex: 1, fontWeight: 600, fontSize: "16px" }}>
+              <div
+                style={{
+                  flex: 1,
+                  fontFamily: serif,
+                  fontWeight: 400,
+                  fontSize: "20px",
+                  letterSpacing: "-0.01em",
+                }}
+              >
                 {selectedUsername}
               </div>
               <span
                 style={{
-                  fontSize: "11px",
-                  background: "#d1fae5",
-                  color: "#065f46",
-                  padding: "3px 10px",
-                  borderRadius: "20px",
-                  fontWeight: 500,
+                  ...eyebrow,
+                  fontSize: "10px",
+                  padding: "5px 11px",
+                  border: `1px solid ${line}`,
+                  borderRadius: "4px",
+                  color: faint,
                 }}
               >
-                Chats are Encrypted
+                End-to-End Encrypted
               </span>
             </div>
 
@@ -666,7 +761,7 @@ export default function Chat() {
               style={{
                 flex: 1,
                 overflowY: "auto",
-                padding: "20px 8%",
+                padding: "28px 10%",
                 display: "flex",
                 flexDirection: "column",
               }}
@@ -675,23 +770,25 @@ export default function Chat() {
                 <div
                   style={{
                     textAlign: "center",
-                    color: "#8696a0",
+                    color: faint,
                     fontSize: "13px",
+                    fontFamily: mono,
+                    letterSpacing: "0.1em",
                     padding: "24px",
                   }}
                 >
-                  Loading...
+                  LOADING…
                 </div>
               ) : messages.length === 0 ? (
                 <div
                   style={{
                     textAlign: "center",
-                    color: "#8696a0",
-                    fontSize: "13px",
+                    color: faint,
+                    fontSize: "14px",
                     padding: "24px",
                   }}
                 >
-                  No messages yet. Say hello!
+                  No messages yet. Say hello.
                 </div>
               ) : (
                 messages.map((msg) => {
@@ -707,25 +804,30 @@ export default function Chat() {
                       style={{
                         display: "flex",
                         justifyContent: isMine ? "flex-end" : "flex-start",
-                        marginBottom: "8px",
+                        marginBottom: "10px",
                       }}
                     >
                       <div
                         style={{
-                          maxWidth: "65%",
-                          padding: "6px 10px 8px",
-                          borderRadius: "8px",
-                          background: isMine ? "#d9fdd3" : "#fff",
-                          boxShadow: "0 1px 0.5px rgba(0,0,0,0.13)",
+                          maxWidth: "62%",
+                          padding: "9px 13px 7px",
+                          borderRadius: isMine
+                            ? "14px 14px 4px 14px"
+                            : "14px 14px 14px 4px",
+                          background: isMine ? ink : cardBg,
+                          border: isMine ? "none" : `1px solid ${line}`,
+                          color: isMine ? cream : ink,
                         }}
                       >
-                        <MessageContent msg={msg} />
+                        <MessageContent msg={msg} isMine={isMine} />
                         <div
                           style={{
-                            fontSize: "11px",
-                            color: "#667781",
+                            fontSize: "10px",
+                            fontFamily: mono,
+                            letterSpacing: "0.05em",
+                            color: isMine ? "rgba(250,248,243,0.45)" : faintest,
                             textAlign: "right",
-                            marginTop: "2px",
+                            marginTop: "4px",
                           }}
                         >
                           {time}
@@ -741,24 +843,26 @@ export default function Chat() {
             {sendError && (
               <div
                 style={{
-                  padding: "8px 16px",
-                  background: "#fef2f2",
-                  color: "#991b1b",
+                  padding: "10px 24px",
+                  background: "#f8ece9",
+                  color: "#7c2d25",
                   fontSize: "13px",
-                  borderTop: "1px solid #fee2e2",
+                  borderTop: "1px solid #f0d8d2",
+                  borderLeft: "3px solid #b3433a",
                 }}
               >
-                ⚠️ {sendError}
+                ⚠ {sendError}
               </div>
             )}
 
             <div
               style={{
-                padding: "10px 16px",
-                background: "#f0f2f5",
+                padding: "14px 24px",
+                background: cream,
                 display: "flex",
-                gap: "8px",
+                gap: "12px",
                 alignItems: "center",
+                borderTop: `1px solid ${line}`,
               }}
             >
               <input
@@ -772,18 +876,18 @@ export default function Chat() {
                 disabled={isSending}
                 title="Attach a file"
                 style={{
-                  width: "40px",
-                  height: "40px",
+                  width: "42px",
+                  height: "42px",
                   borderRadius: "50%",
-                  border: "none",
-                  background: "#e5e7eb",
-                  color: "#54656f",
-                  fontSize: "18px",
+                  border: `1px solid ${line}`,
+                  background: paper,
+                  color: muted,
+                  fontSize: "17px",
                   cursor: isSending ? "not-allowed" : "pointer",
                   flexShrink: 0,
                 }}
               >
-                📎
+                ↟
               </button>
 
               <input
@@ -799,12 +903,14 @@ export default function Chat() {
                 disabled={isSending}
                 style={{
                   flex: 1,
-                  padding: "10px 16px",
-                  border: "none",
+                  padding: "12px 18px",
+                  border: `1px solid ${line}`,
                   borderRadius: "24px",
                   fontSize: "15px",
+                  color: ink,
                   outline: "none",
-                  background: "#fff",
+                  background: cardBg,
+                  fontFamily: sans,
                 }}
               />
 
@@ -812,21 +918,22 @@ export default function Chat() {
                 onClick={handleSend}
                 disabled={isSending || !messageInput.trim()}
                 style={{
-                  width: "44px",
-                  height: "44px",
+                  width: "46px",
+                  height: "46px",
                   borderRadius: "50%",
                   border: "none",
-                  background: messageInput.trim() ? "#6366F1" : "#e5e7eb",
-                  color: "white",
+                  background: messageInput.trim() ? ink : line,
+                  color: messageInput.trim() ? cream : faintest,
                   fontSize: "18px",
                   cursor: messageInput.trim() ? "pointer" : "not-allowed",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   flexShrink: 0,
+                  transition: "background 0.2s",
                 }}
               >
-                ➤
+                →
               </button>
             </div>
           </>
@@ -838,23 +945,54 @@ export default function Chat() {
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              color: "#8696a0",
-              gap: "12px",
-              background: "#f0f2f5",
+              textAlign: "center",
+              background: paper,
+              padding: "40px",
             }}
           >
-            <div style={{ fontSize: "64px" }}></div>
-            <div
-              style={{ fontSize: "22px", fontWeight: 300, color: "#41525d" }}
+            <p
+              style={{
+                ...eyebrow,
+                fontSize: "11px",
+                margin: "0 0 18px",
+              }}
             >
-              Cipher Messenger
+              End-to-End Encrypted Messenger
+            </p>
+            <div
+              style={{
+                fontFamily: serif,
+                fontSize: "52px",
+                fontWeight: 400,
+                letterSpacing: "-0.02em",
+                color: ink,
+                margin: "0 0 14px",
+              }}
+            >
+              Cipher
             </div>
-            <div style={{ fontSize: "14px" }}>
-              Select a chat or search for a user to begin
+            <div
+              style={{
+                fontSize: "15px",
+                color: muted,
+                lineHeight: 1.6,
+                maxWidth: "32ch",
+              }}
+            >
+              Select a chat or search for someone to begin. Every message is
+              sealed on your device before it leaves.
             </div>
-            <div style={{ fontSize: "12px", marginTop: "8px" }}>
-              Your messages are end-to-end encrypted
-            </div>
+            <p
+              style={{
+                ...eyebrow,
+                fontSize: "10px",
+                letterSpacing: "0.1em",
+                color: faintest,
+                marginTop: "44px",
+              }}
+            >
+              RSA-OAEP 4096 · AES-256-GCM · zero-knowledge server
+            </p>
           </div>
         )}
       </div>
